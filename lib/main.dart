@@ -40,9 +40,10 @@ class _MyHomePageState extends State<MyHomePage> {
   final wasmProvider = WasmProvider();
   final String _passPhrase = 'verySecretWord';
   final String _pinCode = '1111';
+  final String _wasmFilePath = 'assets/wasm/tauon_test.wasm';
 
   WasmInstance? _wasmInstance;
-  Wallet? _wallet;
+  // Wallet? _wallet;
 
   /// Wallet storage.
   Uint8List? _devicePinBuff;
@@ -54,30 +55,33 @@ class _MyHomePageState extends State<MyHomePage> {
     super.initState();
   }
 
-  Future<void> _loadWasm() async {
+  Future<void> _initWasm() async {
     if (_wasmInstance == null) {
-      print('Loading wasm ...');
-      _wasmInstance = await wasmProvider.loadWasmFile();
-      _wallet = Wallet(_wasmInstance!);
+      print('Init wallet ...');
+      _wasmInstance = await wasmProvider.createInstance(_wasmFilePath);
     }
   }
 
   Future<void> _createWallet() async {
-    await _loadWasm();
+    await _initWasm();
     print('Creating a wallet ...');
-    int walletCreateResult = _wallet!.createWallet(_passPhrase, _pinCode);
+    Wallet wallet = Wallet(_wasmInstance!);
+    int walletCreateResult = wallet.createWallet(_passPhrase, _pinCode);
     print('Wallet create result: $walletCreateResult');
-    int loginResult = _wallet!.login(_pinCode);
+    int loginResult = wallet.login(_pinCode);
     print('Wallet login result: $loginResult');
 
-    var pubKey = _wallet!.getPublicKey();
+    var pubKey = wallet.getPublicKey();
     print('PublicKey: ${base64Url.encode(pubKey.toList())}');
 
-    _wallet?.addTestAmount(10000);
+    wallet.addTestAmount(10000);
 
-    _devicePinBuff = _wallet!.getDevicePin();
-    _recoverGenBuff = _wallet!.getRecoverGen();
-    _accountBuff = _wallet!.getAccount();
+    _devicePinBuff = wallet.getDevicePin()['data'];
+    _recoverGenBuff = wallet.getRecoverGen()['data'];
+    _accountBuff = wallet.getAccount()['data'];
+    print('_devicePinBuff ${base64Url.encode(_devicePinBuff!)}');
+    print('_recoverGenBuff ${base64Url.encode(_recoverGenBuff!)}');
+    print('_accountBuff ${base64Url.encode(_accountBuff!)}');
 
     print('Device len: ${_devicePinBuff!.toList().length}');
     print('Recover len: ${_recoverGenBuff!.toList().length}');
@@ -85,19 +89,57 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   Future<void> _loadWallet() async {
-    await _loadWasm();
+    await _initWasm();
     print('Loading a wallet ...');
-    int reaedWalletResult = _wallet!.readWallet(
-      _devicePinBuff!,
-      _recoverGenBuff!,
-      _accountBuff!,
+    Wallet wallet = Wallet(_wasmInstance!);
+    // int reaedWalletResult = wallet.readWallet(
+    //   _devicePinBuff!,
+    //   _recoverGenBuff!,
+    //   _accountBuff!,
+    // );
+    int reaedWalletResult = wallet.readWallet(
+      base64Url.decode(deviceBase64),
+      base64Url.decode(recoverBase64),
+      base64Url.decode(accountBase64),
     );
     print('Read wallet result: $reaedWalletResult');
 
-    int loginResult = _wallet!.login(_pinCode);
+    int loginResult = wallet.login(_pinCode);
     print('Wallet login result: $loginResult');
-    var pubKey = _wallet?.getPublicKey();
-    print('PublicKey: ${base64Url.encode(pubKey!.toList())}');
+    var pubKey = wallet.getPublicKey();
+    print('PublicKey: ${base64Url.encode(pubKey.toList())}');
+  }
+
+  Future<void> createWalletInline() async {
+    await _initWasm();
+    print('Creating a wallet ...');
+    Wallet wallet1 = Wallet(wasmProvider.instance);
+    int walletCreateResult = wallet1.createWallet(_passPhrase, _pinCode);
+    print('Wallet create result: $walletCreateResult');
+    int loginResult = wallet1.login(_pinCode);
+    print('Wallet login result: $loginResult');
+
+    var pubKey = wallet1.getPublicKey();
+    print('PublicKey: ${base64Url.encode(pubKey.toList())}');
+
+    wallet1.addTestAmount(10000);
+
+    final devicePin = wallet1.getDevicePin();
+    final recoverGen = wallet1.getRecoverGen();
+    final account = wallet1.getAccount();
+
+    Wallet wallet2 = Wallet(wasmProvider.instance);
+
+    print('Loading a wallet ...');
+    int readWalletResult = wallet2.readWalletPtrs(
+      devicePin['ptr'],
+      devicePin['len'],
+      recoverGen['ptr'],
+      recoverGen['len'],
+      account['ptr'],
+      account['len'],
+    );
+    print('Read wallet result: $readWalletResult');
   }
 
   @override
@@ -125,7 +167,7 @@ class _MyHomePageState extends State<MyHomePage> {
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
           FloatingActionButton(
-            onPressed: _loadWasm,
+            onPressed: _initWasm,
             tooltip: 'Load',
             child: const Icon(Icons.refresh),
           ),

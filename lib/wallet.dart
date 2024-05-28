@@ -11,8 +11,7 @@ class Wallet {
   Wallet(WasmInstance instance) {
     _instance = instance;
     _thisPtr = _getPointer(walletSize);
-    _instance.getFunction('tagion_wallet_create_instance')!.inner(_thisPtr);
-    // _instance.getMemory('memory')?.grow(500); // 1000 = exception
+    instance.getFunction('tagion_wallet_create_instance')!.inner(_thisPtr);
   }
 
   // Pointer ops.
@@ -22,13 +21,16 @@ class Wallet {
   }
 
   void _freePointer(int ptr) {
-    _instance.getFunction('mydealloc')!.inner(ptr);
+    // _instance.getFunction('mydealloc')!.inner(ptr);
   }
 
   Map<String, dynamic> _allocate(List<int> toAlloc) {
     final toAllocPtr = _getPointer(toAlloc.length);
     WasmMemory? memory = _instance.getMemory('memory');
-    if (memory == null) throw Exception();
+
+    if (memory == null) {
+      throw Exception('Memory is not found');
+    }
 
     memory.view.setAll(toAllocPtr, toAlloc);
 
@@ -43,16 +45,16 @@ class Wallet {
   }
 
   Uint8List _getAllocated(int ptr, int len) {
-    final wasmMemory = _instance.getMemory('memory');
+    final memory = _instance.getMemory('memory');
 
-    if (wasmMemory == null) {
+    if (memory == null) {
       throw Exception('Memory is not found');
     }
 
-    Uint32List ptrInMem = Uint32List.view(wasmMemory.view.buffer, ptr, 1);
-    Uint32List lenInMem = Uint32List.view(wasmMemory.view.buffer, len, 1);
+    Uint32List ptrInMem = Uint32List.view(memory.view.buffer, ptr, 1);
+    Uint32List lenInMem = Uint32List.view(memory.view.buffer, len, 1);
 
-    return wasmMemory.view.buffer.asUint8List(ptrInMem[0], lenInMem[0]);
+    return memory.view.buffer.asUint8List(ptrInMem[0], lenInMem[0]);
   }
 
   int createWallet(String passphrase, String pincode) {
@@ -104,7 +106,28 @@ class Wallet {
     return status;
   }
 
-  Uint8List getDevicePin() {
+  int readWalletPtrs(
+    int devicePinPtr,
+    int devicePinLen,
+    int recoverGenPtr,
+    int recoverGenLen,
+    int accountPtr,
+    int accountLen,
+  ) {
+    int status = _instance.getFunction('tagion_wallet_read_wallet')!.inner(
+          _thisPtr,
+          devicePinPtr,
+          devicePinLen,
+          recoverGenPtr,
+          recoverGenLen,
+          accountPtr,
+          accountLen,
+        );
+
+    return status;
+  }
+
+  Map<String, dynamic> getDevicePin() {
     final devicePinPtrPtr = _getPointer(4);
     final devicePinLenPtr = _getPointer(4);
 
@@ -113,10 +136,10 @@ class Wallet {
     final data = _getAllocated(devicePinPtrPtr, devicePinLenPtr);
     _freePointer(devicePinPtrPtr);
     _freePointer(devicePinLenPtr);
-    return data;
+    return {'data': data, 'ptr': devicePinPtrPtr, 'len': devicePinLenPtr};
   }
 
-  Uint8List getRecoverGen() {
+  Map<String, dynamic> getRecoverGen() {
     final recoverGenPtrPtr = _getPointer(4);
     final recoverGenLenPtr = _getPointer(4);
 
@@ -124,10 +147,10 @@ class Wallet {
     final data = _getAllocated(recoverGenPtrPtr, recoverGenLenPtr);
     _freePointer(recoverGenPtrPtr);
     _freePointer(recoverGenLenPtr);
-    return data;
+    return {'data': data, 'ptr': recoverGenPtrPtr, 'len': recoverGenLenPtr};
   }
 
-  Uint8List getAccount() {
+  Map<String, dynamic> getAccount() {
     final accountPtrPtr = _getPointer(4);
     final accountLenPtr = _getPointer(4);
 
@@ -135,7 +158,7 @@ class Wallet {
     final data = _getAllocated(accountPtrPtr, accountLenPtr);
     _freePointer(accountPtrPtr);
     _freePointer(accountLenPtr);
-    return data;
+    return {'data': data, 'ptr': accountPtrPtr, 'len': accountLenPtr};
   }
 
   Uint8List getPublicKey() {
