@@ -1,0 +1,14 @@
+{
+    "files.associations": {
+        "_dev_t.h": "c",
+        "stdlib.h": "c",
+        "random.h": "c",
+        "sysctl.h": "c",
+        "stdint.h": "c",
+        "types.h": "c",
+        "_uint32_t.h": "c",
+        "stdio.h": "c",
+        "_mode_t.h": "c",
+        "time.h": "c"
+    }
+}
