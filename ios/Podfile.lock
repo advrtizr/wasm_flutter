@@ -1,0 +1,21 @@
+PODS:
+  - Flutter (1.0.0)
+  - wasm_run_flutter (0.0.1)
+
+DEPENDENCIES:
+  - Flutter (from `Flutter`)
+  - wasm_run_flutter (from `.symlinks/plugins/wasm_run_flutter/ios`)
+
+EXTERNAL SOURCES:
+  Flutter:
+    :path: Flutter
+  wasm_run_flutter:
+    :path: ".symlinks/plugins/wasm_run_flutter/ios"
+
+SPEC CHECKSUMS:
+  Flutter: f04841e97a9d0b0a8025694d0796dd46242b2854
+  wasm_run_flutter: 2f91e8869ddce786e92e3ec99175647fea2284a4
+
+PODFILE CHECKSUM: 70d9d25280d0dd177a5f637cdb0f0b0b12c6a189
+
+COCOAPODS: 1.12.1
