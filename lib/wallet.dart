@@ -21,7 +21,15 @@ class Wallet {
   }
 
   void _freePointer(int ptr) {
-    // _instance.getFunction('mydealloc')!.inner(ptr);
+    _instance.getFunction('mydealloc')!.inner(ptr);
+  }
+
+  Map<String, dynamic> allocate(List<int> toAlloc) {
+    return _allocate(toAlloc);
+  }
+
+  void freePtr(int ptr) {
+    _freePointer(ptr);
   }
 
   Map<String, dynamic> _allocate(List<int> toAlloc) {
@@ -123,7 +131,9 @@ class Wallet {
           accountPtr,
           accountLen,
         );
-
+    _freePointer(devicePinPtr);
+    _freePointer(recoverGenPtr);
+    _freePointer(accountPtr);
     return status;
   }
 

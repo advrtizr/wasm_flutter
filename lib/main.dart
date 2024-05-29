@@ -50,6 +50,10 @@ class _MyHomePageState extends State<MyHomePage> {
   Uint8List? _recoverGenBuff;
   Uint8List? _accountBuff;
 
+  String? _devicePinBase64;
+  String? _recoverGenBase64;
+  String? _accountBase64;
+
   @override
   void initState() {
     super.initState();
@@ -65,7 +69,7 @@ class _MyHomePageState extends State<MyHomePage> {
   Future<void> _createWallet() async {
     await _initWasm();
     print('Creating a wallet ...');
-    Wallet wallet = Wallet(_wasmInstance!);
+    final wallet = Wallet(_wasmInstance!);
     int walletCreateResult = wallet.createWallet(_passPhrase, _pinCode);
     print('Wallet create result: $walletCreateResult');
     int loginResult = wallet.login(_pinCode);
@@ -79,9 +83,14 @@ class _MyHomePageState extends State<MyHomePage> {
     _devicePinBuff = wallet.getDevicePin()['data'];
     _recoverGenBuff = wallet.getRecoverGen()['data'];
     _accountBuff = wallet.getAccount()['data'];
-    print('_devicePinBuff ${base64Url.encode(_devicePinBuff!)}');
-    print('_recoverGenBuff ${base64Url.encode(_recoverGenBuff!)}');
-    print('_accountBuff ${base64Url.encode(_accountBuff!)}');
+
+    _devicePinBase64 = base64Url.encode(_devicePinBuff!);
+    _recoverGenBase64 = base64Url.encode(_recoverGenBuff!);
+    _accountBase64 = base64Url.encode(_accountBuff!);
+
+    print('_devicePinBase64 $_devicePinBase64');
+    print('_recoverGenBase64 $_recoverGenBase64');
+    print('_accountBase64 $_accountBase64');
 
     print('Device len: ${_devicePinBuff!.toList().length}');
     print('Recover len: ${_recoverGenBuff!.toList().length}');
@@ -91,18 +100,20 @@ class _MyHomePageState extends State<MyHomePage> {
   Future<void> _loadWallet() async {
     await _initWasm();
     print('Loading a wallet ...');
-    Wallet wallet = Wallet(_wasmInstance!);
-    // int reaedWalletResult = wallet.readWallet(
+    final wallet = Wallet(_wasmInstance!);
+    // int readWalletResult = wallet.readWallet(
     //   _devicePinBuff!,
     //   _recoverGenBuff!,
     //   _accountBuff!,
     // );
-    int reaedWalletResult = wallet.readWallet(
+
+    /// load data saved in global.dart.
+    int readWalletResult = wallet.readWallet(
       base64Url.decode(deviceBase64),
       base64Url.decode(recoverBase64),
       base64Url.decode(accountBase64),
     );
-    print('Read wallet result: $reaedWalletResult');
+    print('Read wallet result: $readWalletResult');
 
     int loginResult = wallet.login(_pinCode);
     print('Wallet login result: $loginResult');
@@ -142,6 +153,46 @@ class _MyHomePageState extends State<MyHomePage> {
     print('Read wallet result: $readWalletResult');
   }
 
+  void _testAllocation() async {
+    await _initWasm();
+    final wallet = Wallet(wasmProvider.instance);
+
+    // dummy data.
+    final list1 = List.generate(117, (i) => i + 1);
+    final list2 = List.generate(56, (i) => i + 1);
+    final list3 = List.generate(307, (i) => i + 1);
+
+    // real data.
+    final data1 = base64Url.decode(deviceBase64);
+    final data2 = base64Url.decode(recoverBase64);
+    final data3 = base64Url.decode(accountBase64);
+
+    var alloc1 = wallet.allocate(data1);
+    var alloc2 = wallet.allocate(data2);
+    var alloc3 = wallet.allocate(data3);
+
+    print('allocate1: ${alloc1['ptr']}, ${alloc1['len']}');
+    print('allocate2: ${alloc2['ptr']}, ${alloc2['len']}');
+    print('allocate3: ${alloc3['ptr']}, ${alloc3['len']}');
+
+    // wallet.freePtr(alloc1['ptr']);
+    // wallet.freePtr(alloc2['ptr']);
+    // wallet.freePtr(alloc3['ptr']);
+
+    // Caused by:
+    // wasm trap: wasm `unreachable` instruction executed)
+    int result = wallet.readWalletPtrs(
+      alloc1['ptr'],
+      alloc1['len'],
+      alloc2['ptr'],
+      alloc2['len'],
+      alloc3['ptr'],
+      alloc3['len'],
+    );
+
+    print('readWalletPtrs result: $result');
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -167,12 +218,6 @@ class _MyHomePageState extends State<MyHomePage> {
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
           FloatingActionButton(
-            onPressed: _initWasm,
-            tooltip: 'Load',
-            child: const Icon(Icons.refresh),
-          ),
-          const SizedBox(height: 10.0),
-          FloatingActionButton(
             onPressed: _createWallet,
             tooltip: 'Create',
             child: const Icon(Icons.add),
@@ -182,6 +227,12 @@ class _MyHomePageState extends State<MyHomePage> {
             onPressed: _loadWallet,
             tooltip: 'Load',
             child: const Icon(Icons.arrow_downward),
+          ),
+          const SizedBox(height: 10.0),
+          FloatingActionButton(
+            onPressed: _testAllocation,
+            tooltip: 'Load',
+            child: const Icon(Icons.file_copy),
           ),
         ],
       ),
