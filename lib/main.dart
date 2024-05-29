@@ -158,39 +158,45 @@ class _MyHomePageState extends State<MyHomePage> {
     final wallet = Wallet(wasmProvider.instance);
 
     // dummy data.
-    final list1 = List.generate(117, (i) => i + 1);
-    final list2 = List.generate(56, (i) => i + 1);
-    final list3 = List.generate(307, (i) => i + 1);
+    final dummy1 = List.generate(117, (i) => i + 1);
+    final dummy2 = List.generate(56, (i) => i + 1);
+    final dummy3 = List.generate(307, (i) => i + 1);
 
     // real data.
     final data1 = base64Url.decode(deviceBase64);
     final data2 = base64Url.decode(recoverBase64);
     final data3 = base64Url.decode(accountBase64);
 
-    var alloc1 = wallet.allocate(data1);
-    var alloc2 = wallet.allocate(data2);
-    var alloc3 = wallet.allocate(data3);
+    // var alloc1 = wallet.allocate(data1);
+    // var alloc2 = wallet.allocate(data2);
+    // var alloc3 = wallet.allocate(data3);
+
+    // Caused by:
+    // wasm trap: wasm `unreachable` instruction executed)
+    var alloc1 = wallet.allocate(dummy1);
+    var alloc2 = wallet.allocate(dummy1);
+    var alloc3 = wallet.allocate(dummy1);
 
     print('allocate1: ${alloc1['ptr']}, ${alloc1['len']}');
     print('allocate2: ${alloc2['ptr']}, ${alloc2['len']}');
     print('allocate3: ${alloc3['ptr']}, ${alloc3['len']}');
 
-    // wallet.freePtr(alloc1['ptr']);
-    // wallet.freePtr(alloc2['ptr']);
-    // wallet.freePtr(alloc3['ptr']);
+    wallet.freePtr(alloc1['ptr']);
+    wallet.freePtr(alloc2['ptr']);
+    wallet.freePtr(alloc3['ptr']);
 
     // Caused by:
     // wasm trap: wasm `unreachable` instruction executed)
-    int result = wallet.readWalletPtrs(
-      alloc1['ptr'],
-      alloc1['len'],
-      alloc2['ptr'],
-      alloc2['len'],
-      alloc3['ptr'],
-      alloc3['len'],
-    );
+    // int result = wallet.readWalletPtrs(
+    //   alloc1['ptr'],
+    //   alloc1['len'],
+    //   alloc2['ptr'],
+    //   alloc2['len'],
+    //   alloc3['ptr'],
+    //   alloc3['len'],
+    // );
 
-    print('readWalletPtrs result: $result');
+    // print('readWalletPtrs result: $result');
   }
 
   @override
