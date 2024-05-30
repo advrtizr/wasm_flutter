@@ -158,9 +158,9 @@ class _MyHomePageState extends State<MyHomePage> {
     final wallet = Wallet(wasmProvider.instance);
 
     // dummy data.
-    final dummy1 = List.generate(117, (i) => i + 1);
-    final dummy2 = List.generate(56, (i) => i + 1);
-    final dummy3 = List.generate(307, (i) => i + 1);
+    final dummy1 = Uint8List.fromList(List.generate(117, (i) => i + 1));
+    final dummy2 = Uint8List.fromList(List.generate(56, (i) => i + 1));
+    final dummy3 = Uint8List.fromList(List.generate(307, (i) => i + 1));
 
     // real data.
     final data1 = base64Url.decode(deviceBase64);
@@ -173,9 +173,9 @@ class _MyHomePageState extends State<MyHomePage> {
 
     // Caused by:
     // wasm trap: wasm `unreachable` instruction executed)
-    var alloc1 = wallet.allocate(dummy1);
-    var alloc2 = wallet.allocate(dummy1);
-    var alloc3 = wallet.allocate(dummy1);
+    var alloc1 = wallet.allocate(data1);
+    var alloc2 = wallet.allocate(data2);
+    var alloc3 = wallet.allocate(data3);
 
     print('allocate1: ${alloc1['ptr']}, ${alloc1['len']}');
     print('allocate2: ${alloc2['ptr']}, ${alloc2['len']}');
@@ -187,16 +187,16 @@ class _MyHomePageState extends State<MyHomePage> {
 
     // Caused by:
     // wasm trap: wasm `unreachable` instruction executed)
-    // int result = wallet.readWalletPtrs(
-    //   alloc1['ptr'],
-    //   alloc1['len'],
-    //   alloc2['ptr'],
-    //   alloc2['len'],
-    //   alloc3['ptr'],
-    //   alloc3['len'],
-    // );
+    int result = wallet.readWalletPtrs(
+      alloc1['ptr'],
+      alloc1['len'],
+      alloc2['ptr'],
+      alloc2['len'],
+      alloc3['ptr'],
+      alloc3['len'],
+    );
 
-    // print('readWalletPtrs result: $result');
+    print('readWalletPtrs result: $result');
   }
 
   @override

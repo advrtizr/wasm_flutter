@@ -16,15 +16,17 @@ class Wallet {
 
   // Pointer ops.
   int _getPointer(int size) {
-    final WasmFunction mymallocFunc = _instance.getFunction('mymalloc')!;
+    // final WasmFunction mymallocFunc = _instance.getFunction('mymalloc')!;
+    final WasmFunction mymallocFunc = _instance.getFunction('gc_malloc')!;
     return mymallocFunc.inner(size);
   }
 
   void _freePointer(int ptr) {
-    _instance.getFunction('mydealloc')!.inner(ptr);
+    // _instance.getFunction('mydealloc')!.inner(ptr);
+    _instance.getFunction('gc_free')!.inner(ptr);
   }
 
-  Map<String, dynamic> allocate(List<int> toAlloc) {
+  Map<String, dynamic> allocate(Uint8List toAlloc) {
     return _allocate(toAlloc);
   }
 
@@ -32,8 +34,8 @@ class Wallet {
     _freePointer(ptr);
   }
 
-  Map<String, dynamic> _allocate(List<int> toAlloc) {
-    final toAllocPtr = _getPointer(toAlloc.length);
+  Map<String, dynamic> _allocate(Uint8List toAlloc) {
+    final toAllocPtr = _getPointer(toAlloc.lengthInBytes);
     WasmMemory? memory = _instance.getMemory('memory');
 
     if (memory == null) {
@@ -44,12 +46,12 @@ class Wallet {
 
     return {
       'ptr': toAllocPtr,
-      'len': toAlloc.length,
+      'len': toAlloc.lengthInBytes,
     };
   }
 
   Map<String, dynamic> _allocateStr(String str) {
-    return _allocate(utf8.encode(str));
+    return _allocate(Uint8List.fromList(utf8.encode(str)));
   }
 
   Uint8List _getAllocated(int ptr, int len) {
@@ -98,19 +100,15 @@ class Wallet {
     final accountAlloc = _allocate(account);
     final recoverGenAlloc = _allocate(recoverGen);
 
-    int status = _instance.getFunction('tagion_wallet_read_wallet')!.inner(
-          _thisPtr,
-          devicePinAlloc['ptr'],
-          devicePinAlloc['len'],
-          recoverGenAlloc['ptr'],
-          recoverGenAlloc['len'],
-          accountAlloc['ptr'],
-          accountAlloc['len'],
-        );
+    int status = readWalletPtrs(
+      devicePinAlloc['ptr'],
+      devicePinAlloc['len'],
+      recoverGenAlloc['ptr'],
+      recoverGenAlloc['len'],
+      accountAlloc['ptr'],
+      accountAlloc['len'],
+    );
 
-    _freePointer(devicePinAlloc['ptr']);
-    _freePointer(recoverGenAlloc['ptr']);
-    _freePointer(accountAlloc['ptr']);
     return status;
   }
 
