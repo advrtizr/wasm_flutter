@@ -15,7 +15,13 @@ class WasmProvider {
       binary,
       config: const ModuleConfig(
         wasmi: ModuleConfigWasmi(),
-        wasmtime: ModuleConfigWasmtime(),
+        wasmtime: ModuleConfigWasmtime(
+          // staticMemoryMaximumSize: 1024 * 1024 * 1024,
+          wasmMemory64: true,
+          debugInfo: true,
+          wasmMultiMemory: true,
+          wasmBacktrace: true,
+        ),
       ),
     );
 
@@ -26,6 +32,11 @@ class WasmProvider {
       preopenedDirs: [],
       webBrowserFileSystem: {},
     );
+
+    // final builder = module.builder(wasiConfig: wasiConfig);
+    // WasmMemory _memory = builder.createMemory(minPages: 10, maxPages: 100);
+    // _memory.grow(deltaPages);
+    // _instance = await builder.build();
 
     _instance = await module.builder(wasiConfig: wasiConfig).build();
     return _instance;

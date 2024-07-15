@@ -1,29 +1,35 @@
 import 'dart:convert';
+import 'dart:ffi';
 import 'dart:typed_data';
+
+import 'package:flutter/foundation.dart';
 import 'package:wasm_run_flutter/wasm_run_flutter.dart';
 
 class Wallet {
-  static const int walletSize = 16; //bytes
+  final int walletSize = 128; // bytes
+  final int dataSize = sizeOf<Uint8>(); // 4 bytes
 
   late final WasmInstance _instance;
   late int _thisPtr;
+  bool _isInstanceCreated = false;
 
   Wallet(WasmInstance instance) {
     _instance = instance;
     _thisPtr = _getPointer(walletSize);
-    instance.getFunction('tagion_wallet_create_instance')!.inner(_thisPtr);
+    _isInstanceCreated = instance.getFunction('tagion_wallet_create_instance')!.inner(_thisPtr) == 0;
+    print('Wallet _thisPtr $_thisPtr');
+    print('Wallet _isInstanceCreated $_isInstanceCreated');
   }
 
   // Pointer ops.
   int _getPointer(int size) {
-    // final WasmFunction mymallocFunc = _instance.getFunction('mymalloc')!;
-    final WasmFunction mymallocFunc = _instance.getFunction('gc_malloc')!;
-    return mymallocFunc.inner(size);
+    // print('_getPointer mymalloc size $size');
+    return _instance.getFunction('mymalloc')!.inner(size);
   }
 
   void _freePointer(int ptr) {
-    // _instance.getFunction('mydealloc')!.inner(ptr);
-    _instance.getFunction('gc_free')!.inner(ptr);
+    // print('_freePointer $ptr');
+    _instance.getFunction('mydealloc')!.inner(ptr);
   }
 
   Map<String, dynamic> allocate(Uint8List toAlloc) {
@@ -35,14 +41,22 @@ class Wallet {
   }
 
   Map<String, dynamic> _allocate(Uint8List toAlloc) {
-    final toAllocPtr = _getPointer(toAlloc.lengthInBytes);
+    // Ensure to get the correct pointer from the WASM instance
+    final int toAllocPtr = _getPointer(toAlloc.lengthInBytes);
     WasmMemory? memory = _instance.getMemory('memory');
 
     if (memory == null) {
-      throw Exception('Memory is not found');
+      throw Exception('Memory not found');
     }
 
-    memory.view.setAll(toAllocPtr, toAlloc);
+    // memory.view.setAll(toAllocPtr, toAlloc);
+
+    // Ensure the memory view is correctly accessed
+    for (int i = 0; i < toAlloc.lengthInBytes; i++) {
+      memory.view[toAllocPtr + i] = toAlloc[i];
+    }
+
+    print('ptrInMem $toAllocPtr lenInMem ${toAlloc.lengthInBytes}');
 
     return {
       'ptr': toAllocPtr,
@@ -61,13 +75,34 @@ class Wallet {
       throw Exception('Memory is not found');
     }
 
-    Uint32List ptrInMem = Uint32List.view(memory.view.buffer, ptr, 1);
-    Uint32List lenInMem = Uint32List.view(memory.view.buffer, len, 1);
+    final ptrInMem = Uint32List.view(memory.view.buffer, ptr, 1)[0];
+    final lenInMem = Uint32List.view(memory.view.buffer, len, 1)[0];
 
-    return memory.view.buffer.asUint8List(ptrInMem[0], lenInMem[0]);
+    print('ptrInMem $ptrInMem lenInMem $lenInMem');
+
+    return memory.view.buffer.asUint8List(ptrInMem, lenInMem);
+  }
+
+  // Uint8List _getAllocated(int ptr, int len) {
+  //   final memory = _instance.getMemory('memory');
+
+  //   if (memory == null) {
+  //     throw Exception('Memory not found');
+  //   }
+
+  //   return memory.view.buffer.asUint8List(ptr, len);
+  // }
+
+  void checkStr(Uint8List data) {
+    final dataAlloc = _allocate(data);
+    print('checkStr dataAlloc ${dataAlloc['ptr']}');
+    Uint8List memData = _getAllocated(dataAlloc['ptr'], dataAlloc['len']);
+    print('checkStr data == memData ${listEquals(data, memData)}');
+    _freePointer(dataAlloc['ptr']);
   }
 
   int createWallet(String passphrase, String pincode) {
+    if (!_isInstanceCreated) return -1;
     final passphraseAlloc = _allocateStr(passphrase);
     final pincodeAlloc = _allocateStr(pincode);
     final WasmFunction createWalletFunc = _instance.getFunction('tagion_wallet_create_wallet')!;
@@ -78,6 +113,7 @@ class Wallet {
       pincodeAlloc['ptr'],
       pincodeAlloc['len'],
     );
+
     _freePointer(passphraseAlloc['ptr']);
     _freePointer(pincodeAlloc['ptr']);
     return status;
@@ -96,9 +132,10 @@ class Wallet {
     Uint8List recoverGen,
     Uint8List account,
   ) {
+    if (!_isInstanceCreated) return -1;
     final devicePinAlloc = _allocate(devicePin);
-    final accountAlloc = _allocate(account);
     final recoverGenAlloc = _allocate(recoverGen);
+    final accountAlloc = _allocate(account);
 
     int status = readWalletPtrs(
       devicePinAlloc['ptr'],
@@ -120,6 +157,11 @@ class Wallet {
     int accountPtr,
     int accountLen,
   ) {
+    print('readWalletPtrs _thisPtr $_thisPtr');
+    print('readWalletPtrs devicePinPtr $devicePinPtr devicePinLen $devicePinLen');
+    print('readWalletPtrs recoverGenPtr $recoverGenPtr recoverGenLen $recoverGenLen');
+    print('readWalletPtrs accountPtr $accountPtr accountLen $accountLen');
+
     int status = _instance.getFunction('tagion_wallet_read_wallet')!.inner(
           _thisPtr,
           devicePinPtr,
@@ -136,8 +178,8 @@ class Wallet {
   }
 
   Map<String, dynamic> getDevicePin() {
-    final devicePinPtrPtr = _getPointer(4);
-    final devicePinLenPtr = _getPointer(4);
+    final devicePinPtrPtr = _getPointer(dataSize);
+    final devicePinLenPtr = _getPointer(dataSize);
 
     _instance.getFunction('tagion_wallet_get_device_pin')!.inner(_thisPtr, devicePinPtrPtr, devicePinLenPtr);
 
@@ -148,8 +190,8 @@ class Wallet {
   }
 
   Map<String, dynamic> getRecoverGen() {
-    final recoverGenPtrPtr = _getPointer(4);
-    final recoverGenLenPtr = _getPointer(4);
+    final recoverGenPtrPtr = _getPointer(dataSize);
+    final recoverGenLenPtr = _getPointer(dataSize);
 
     _instance.getFunction('tagion_wallet_get_recover_generator')!.inner(_thisPtr, recoverGenPtrPtr, recoverGenLenPtr);
     final data = _getAllocated(recoverGenPtrPtr, recoverGenLenPtr);
@@ -159,8 +201,8 @@ class Wallet {
   }
 
   Map<String, dynamic> getAccount() {
-    final accountPtrPtr = _getPointer(4);
-    final accountLenPtr = _getPointer(4);
+    final accountPtrPtr = _getPointer(dataSize);
+    final accountLenPtr = _getPointer(dataSize);
 
     _instance.getFunction('tagion_wallet_get_account')!.inner(_thisPtr, accountPtrPtr, accountLenPtr);
     final data = _getAllocated(accountPtrPtr, accountLenPtr);
@@ -170,8 +212,8 @@ class Wallet {
   }
 
   Uint8List getPublicKey() {
-    final publicKeyPtrPtr = _getPointer(4);
-    final publicKeyLenPtr = _getPointer(4);
+    final publicKeyPtrPtr = _getPointer(dataSize);
+    final publicKeyLenPtr = _getPointer(dataSize);
     _instance.getFunction('tagion_wallet_get_current_pkey')!.inner(_thisPtr, publicKeyPtrPtr, publicKeyLenPtr);
 
     final data = _getAllocated(publicKeyPtrPtr, publicKeyLenPtr);
